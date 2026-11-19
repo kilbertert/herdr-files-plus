@@ -6,6 +6,8 @@ navigation, VS Code file icons, git marks, right-click file operations, drag-and
 upload, and remote files opened in floating editor windows — plus two bonus
 clones (`pane-plus`, `status-plus`).
 
+![The files-plus panel with a floating editor window](preview.png)
+
 ## What you get
 
 - **files-plus** — the panel. Breadcrumb address bar (type a path, click
@@ -24,6 +26,8 @@ clones (`pane-plus`, `status-plus`).
   the window; click again (or the `pane-plus.fullscreen` command) to restore.
 - **status-plus** — shipped `workspace-status` bar + CPU / temperature / RAM
   segments for the active machine.
+
+![The panel: breadcrumb bar, per-type icons, git marks](preview-panel.png)
 
 ## Install
 

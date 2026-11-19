@@ -228,13 +228,17 @@ export default class Files extends View {
     }
     this.refresh(cx);
     cx.timer.every(10000, cx => this.refresh(cx));
-    // `files-plus.open <path>` opens that file's editor window (bindable,
-    // scriptable: `herdr-app do files-plus.open src/index.ts`). Only the
+    // `files-plus.open:<path>` opens that file's editor window (bindable,
+    // scriptable: `herdr-app do files-plus.open:src/index.ts` — `do` drops
+    // --argv for mod commands, the arg must ride in the name). Only the
     // panel copy polls — editor windows would steal commands.
     cx.spawn(async cx => {
       for (;;) {
         const c = await nextCommand();
-        if (c.startsWith("open ")) this.openEditor(c.slice(5).trim());
+        if (c.startsWith("open:") || c.startsWith("open ")) {
+          const path = c.slice(5).trim();
+          if (path) this.openEditor(path);
+        }
         cx.notify();
       }
     });
