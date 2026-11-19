@@ -564,14 +564,22 @@ export default class Files extends View {
   }
 
   addressBar(t) {
-    const bar = h_flex().id("files-addr").flex_1().min_w(0).h(26).items_center().px(6).gap(1).rounded(6).border_1().border_color(t.border);
+    const bar = h_flex().id("files-addr").flex_1().min_w(0).h(26).items_center().px(6).gap(1).rounded(6).border_1().border_color(t.border).overflow_hidden();
     if (this.addrEdit) return bar.child(Input.new(this.address).flex_1().h_full().text_size(12).text_color(t.foreground));
     const kids = [svg("mods/files-plus/folder.svg").size(12).flex_none().text_color(t.dim), div().w(4).flex_none()];
     const segs = this.segments();
-    segs.forEach((s, i) => {
-      const last = i === segs.length - 1;
-      if (i > 0) kids.push(div().px(1).text_size(11).text_color(t.dim).child("›"));
-      kids.push(div().id(`addr-seg-${i}`).cursor_pointer().rounded(4).px(3).py(1).text_size(12).text_color(last ? t.foreground : t.dim)
+    // Deeper than 3: collapse to "…" + the last three so the row stays inside
+    // its box (an h_flex paints overflowing children past its border).
+    const hidden = Math.max(0, segs.length - 3);
+    if (hidden) kids.push(div().id("addr-more").cursor_pointer().rounded(4).px(3).py(1).text_size(12).text_color(t.dim)
+      .hover(s => s.bg(t.hover))
+      .on_click((_e, cx) => { cx.stop_propagation(); this.startAddressEdit(cx); })
+      .child("…"));
+    const shown = segs.slice(hidden);
+    shown.forEach((s, i) => {
+      const last = i === shown.length - 1;
+      if (i > 0 || hidden) kids.push(div().px(1).flex_none().text_size(11).text_color(t.dim).child("›"));
+      kids.push(div().id(`addr-seg-${i}`).cursor_pointer().flex_none().rounded(4).px(3).py(1).text_size(12).text_color(last ? t.foreground : t.dim)
         .when(last, el => el.font_semibold())
         .hover(s => s.bg(t.hover))
         .on_click((_e, cx) => { cx.stop_propagation(); if (last) this.startAddressEdit(cx); else this.setRoot(s.path, cx); })
