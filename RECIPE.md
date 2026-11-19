@@ -12,11 +12,13 @@ expand-on-click folders, watchFolder refresh) plus:
 - **Header, 42px**: "Files" label, then the address bar, then four 26px tool
   buttons (new file, new folder, show-hidden toggle, refresh).
 - **Address bar**: breadcrumb segments of the browse root (`›` separators,
-  last segment bold). Click an ancestor to set the root there; click the last
-  segment or the trailing space to type a path — the `InputState` selects the
-  whole root, Enter pre-checks the path with `directory()` before moving
-  (a typo lands on an error line, not a dead root), blur cancels. `..` row at
-  the top of the tree goes to the parent.
+  last segment bold). More than three ancestors collapse into a `…` chip +
+  the last three (an `h_flex` paints overflowing children past its border,
+  so the bar also clips). Click an ancestor to set the root there; click the
+  last segment, the `…`, or the trailing space to type a path — the
+  `InputState` selects the whole root, Enter pre-checks the path with
+  `directory()` before moving (a typo lands on an error line, not a dead
+  root), blur cancels. `..` row at the top of the tree goes to the parent.
 - **Icons**: rows get a full-color `image()` icon from `mods/files-plus/icons/`
   (a vendored subset of vscode-icons, MIT). Resolution order: exact filename
   (`package.json`, `Dockerfile`, `.gitignore`…) → pattern rules (`.env*`,
