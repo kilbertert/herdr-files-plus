@@ -116,6 +116,19 @@ The shipped status row plus machine metrics for the active space's machine
 exists, `RAM used/total GB`. Upstream's singular/plural fix
 (`1 agent`, `1 needs you`) is included.
 
+## agents-plus (clone of `agents`)
+
+The shipped Agents list plus a **machine filter that follows space-folders'**
+header chevron pick (`shared("space-folders.machine")`, persisted as
+`localStorage["spaces.machine"]`): a remote pick shows only that machine's
+agents, `""` (this computer) only local ones. An agent's machine comes from
+its address — `dev-us/t3` is remote, `t4b` is local — the same split the
+shipped row uses for its machine badge. A pick naming a machine that went
+away falls back to this computer (`machines()` records can lack `.name`, so
+the machine set filters to non-empty strings before checking membership).
+The only other change is `openOverlay`'s sort menu pointing at
+`agents-plus` instead of `agents`.
+
 ## Cross-cutting
 
 - `hc put` prints `{"bytes":N,"path":"..."}` — the path must be `JSON.parse`d;
@@ -130,7 +143,7 @@ exists, `RAM used/total GB`. Upstream's singular/plural fix
 
 ## Used APIs
 
-`spaces, panes, focused, exec, hc, readTextFile, writeTextFile, watchFolder,
+`spaces, machines, panes, focused, exec, hc, readTextFile, writeTextFile, watchFolder,
 theme, settings, window, openOverlay, closeOverlay, props, shared, setShared,
 notify, layout, run, nextCommand, pickFolder, home, agents` — plus
 `View/div/svg/image` (gpui-kit) and `v_flex/h_flex/Editor/EditorState/
