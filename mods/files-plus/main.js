@@ -3,7 +3,7 @@
 // a files-menu popup on right-click, and shared() hooks the menu writes back to.
 import { View, div, svg, image } from "gpui-kit";
 import { v_flex, h_flex, Editor, EditorState, Input, InputState } from "gpui-base";
-import { spaces, panes, focused, exec, hc, readTextFile, writeTextFile, watchFolder, theme, settings, window, openOverlay, closeOverlay, shared, setShared, notify, props } from "herdr";
+import { spaces, panes, focused, exec, hc, readTextFile, writeTextFile, watchFolder, theme, settings, window, openOverlay, closeOverlay, shared, setShared, notify, props, nextCommand } from "herdr";
 
 function location() {
   const space = spaces().find(s => s.active), f = focused();
@@ -228,6 +228,16 @@ export default class Files extends View {
     }
     this.refresh(cx);
     cx.timer.every(10000, cx => this.refresh(cx));
+    // `files-plus.open <path>` opens that file's editor window (bindable,
+    // scriptable: `herdr-app do files-plus.open src/index.ts`). Only the
+    // panel copy polls — editor windows would steal commands.
+    cx.spawn(async cx => {
+      for (;;) {
+        const c = await nextCommand();
+        if (c.startsWith("open ")) this.openEditor(c.slice(5).trim());
+        cx.notify();
+      }
+    });
   }
 
   watch(root, cx) {

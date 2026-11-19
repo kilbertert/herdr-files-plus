@@ -51,6 +51,9 @@ expand-on-click folders, watchFolder refresh) plus:
   `python3 -m zipfile`), delete the archive. No terminal → files ≤ ~60 KB
   go as base64, folders are refused. Per-item errors collect into one
   `notify` summary; the panel then refreshes via the shared hook.
+- **Command**: `files-plus.open <path>` (only the panel copy polls
+  `nextCommand`) opens that file's editor window — bindable, scriptable via
+  `herdr-app do files-plus.open src/index.ts`.
 - **Shared hooks other mods write**: `files-plus.refresh` (reload entries +
   marks), `files-plus.show {path}` (open that file's editor window),
   `files-plus.open {path, preview}` (expand folders to the path, optionally
