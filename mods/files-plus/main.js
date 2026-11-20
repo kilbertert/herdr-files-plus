@@ -738,10 +738,10 @@ export default class Files extends View {
             tool("fe-save", "save", this.dirty ? "Save" : "Saved", (_e, cx) => this.save(cx), this.dirty)))
           .child(tool("fe-close", "mods/workspace-chrome/x", this.dirty && !this.backArmed ? "Close (unsaved changes)" : this.backArmed ? "Discard changes and close?" : "Close", (_e, cx) => this.closeEditor(cx), this.dirty)))))
       .child(noDrag(h_flex().flex_1().min_h(0)
-        .when(!this.isMd() || this.mdMode !== "preview", el => el.child(div().flex_1().min_w(0).min_h(0)
+        .when(!this.isMd() || this.mdMode !== "preview", el => el.child(div().flex_1().min_w(0).h_full()
           .child((this.editCode ?? this.code) ? Editor.new(this.editCode ?? this.code).size_full() : div().p(12).text_color(t.dim).child(this.fileError || "Loading file…"))))
         .when(this.isMd() && this.mdMode === "split", el => el.child(div().w(1).h_full().flex_none().bg(t.border)))
-        .when(this.isMd() && this.mdMode !== "source", el => el.child(div().flex_1().min_w(0).min_h(0).p(14)
+        .when(this.isMd() && this.mdMode !== "source", el => el.child(div().flex_1().min_w(0).h_full().p(14)
           .child(TextView.markdown("fe-md", this.editCode?.value() ?? this.original ?? "").selectable().scrollable().size_full())))))
       .when(Boolean(this.saveError), el => el.child(div().px(10).py(4).text_size(11.5).text_color(t.ansi1).child(`Save failed: ${this.saveError}`)));
   }
