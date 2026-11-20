@@ -2,7 +2,7 @@
 // Adds: new file / new folder / show-hidden toggle / refresh buttons,
 // a files-menu popup on right-click, and shared() hooks the menu writes back to.
 import { View, div, svg, image } from "gpui-kit";
-import { v_flex, h_flex, Editor, EditorState, Input, InputState } from "gpui-base";
+import { v_flex, h_flex, Editor, EditorState, Input, InputState, TextView } from "gpui-base";
 import { spaces, panes, focused, exec, hc, readTextFile, writeTextFile, watchFolder, theme, settings, window, openOverlay, closeOverlay, shared, setShared, notify, props, nextCommand } from "herdr";
 
 function location() {
@@ -221,6 +221,8 @@ export default class Files extends View {
       this.overlay = p.overlay ?? null;
       this.on = p.on ?? null;
       this.term = p.term ?? null;
+      this.fs = p.fs === true;
+      this.mdMode = "source";
       this.context = { key: `overlay:${this.overlay ?? p.file}`, cwd: p.root, on: this.on, root: p.root };
       this.root = p.root;
       this.show(p.file, cx);
@@ -363,6 +365,16 @@ export default class Files extends View {
         this.code = this.editorState(text, true);
         // Editor windows open straight into edit mode — the pencil is gone.
         if (this.overlay != null && text.length <= 400000) this.startEdit(cx);
+        // A zoom-toggle replacement stashed its live buffer first (see toggleFs).
+        const stashKey = `files-plus.buf:${this.wkey()}`;
+        const stash = shared(stashKey);
+        if (stash && this.editCode) {
+          setShared(stashKey, null);
+          if (stash.original === this.original) {
+            this.editCode.set_value(stash.text ?? "");
+            this.dirty = (stash.text ?? "") !== this.original;
+          }
+        }
       } catch { if (this.file === path && this.current(context)) this.fileError = "Cannot preview this file (binary, too large, or unreadable)"; }
       finally { cx.notify(); }
     });
@@ -429,10 +441,31 @@ export default class Files extends View {
 
   // Files open in a floating editor window (Netcatty-style), not inline.
   // `key` makes reopening the same file reuse its window and position.
+  wkey() {
+    return `files-plus:${this.on ?? "local"}:${join(this.root ?? "", this.file ?? "")}`;
+  }
+
   openEditor(path) {
     openOverlay({ mod: "files-plus", kind: "window", width: 0.72, height: 0.8,
       key: `files-plus:${this.on ?? "local"}:${join(this.root, path)}`,
       props: { file: path, root: this.root, on: this.on, term: this.term } });
+  }
+
+  // The editor window's "maximize": reopening the same key replaces the window,
+  // so the live buffer is stashed in shared() for the new copy to pick up (a
+  // disk-changed file makes the stash stale and it is skipped). `fs` rides
+  // props so the replacement knows which state it is in.
+  toggleFs() {
+    const wkey = this.wkey(), full = !this.fs;
+    if (this.editCode) setShared(`files-plus.buf:${wkey}`, { text: this.editCode.value(), original: this.original });
+    openOverlay({ mod: "files-plus", kind: "window", key: wkey,
+      width: full ? 0.98 : 0.72, height: full ? 0.98 : 0.8,
+      at: full ? { x: 0, y: 0 } : undefined,
+      props: { file: this.file, root: this.root, on: this.on, term: this.term, fs: full } });
+  }
+
+  isMd() {
+    return /\.(md|markdown|mdx|mdown|mkd)$/i.test(this.file ?? "");
   }
 
   closeEditor(cx) {
@@ -696,11 +729,20 @@ export default class Files extends View {
         .child(div().flex_1().min_w(0).truncate().font_semibold().child(`${nameOf(this.file ?? "")}${this.dirty ? " ·unsaved" : ""}${this.saving ? " ·saving…" : ""}`))
         .child(div().flex_none().max_w(320).truncate().text_size(11).text_color(t.dim).child(join(this.root ?? "", this.file ?? "")))
         .child(noDrag(h_flex().flex_none().gap(4).items_center()
+          .when(this.isMd(), el => el.children([
+            tool("fe-md-src", "mods/workspace-chrome/square-pen", "Source", (_e, cx) => { this.mdMode = "source"; cx.notify(); }, this.mdMode === "source"),
+            tool("fe-md-split", "mods/workspace-chrome/panel-left", "Source + preview", (_e, cx) => { this.mdMode = "split"; cx.notify(); }, this.mdMode === "split"),
+            tool("fe-md-view", "eye", "Preview", (_e, cx) => { this.mdMode = "preview"; cx.notify(); }, this.mdMode === "preview")]))
+          .child(tool("fe-zoom", "mods/workspace-chrome/square", this.fs ? "Restore size" : "Maximize", () => this.toggleFs(), this.fs))
           .when(this.editing, el => el.child(
             tool("fe-save", "save", this.dirty ? "Save" : "Saved", (_e, cx) => this.save(cx), this.dirty)))
           .child(tool("fe-close", "mods/workspace-chrome/x", this.dirty && !this.backArmed ? "Close (unsaved changes)" : this.backArmed ? "Discard changes and close?" : "Close", (_e, cx) => this.closeEditor(cx), this.dirty)))))
-      .child(noDrag(div().flex_1().min_h(0)
-        .child((this.editCode ?? this.code) ? Editor.new(this.editCode ?? this.code).size_full() : div().p(12).text_color(t.dim).child(this.fileError || "Loading file…"))))
+      .child(noDrag(h_flex().flex_1().min_h(0)
+        .when(!this.isMd() || this.mdMode !== "preview", el => el.child(div().flex_1().min_w(0).min_h(0)
+          .child((this.editCode ?? this.code) ? Editor.new(this.editCode ?? this.code).size_full() : div().p(12).text_color(t.dim).child(this.fileError || "Loading file…"))))
+        .when(this.isMd() && this.mdMode === "split", el => el.child(div().w(1).h_full().flex_none().bg(t.border)))
+        .when(this.isMd() && this.mdMode !== "source", el => el.child(div().flex_1().min_w(0).min_h(0).p(14)
+          .child(TextView.markdown("fe-md", this.editCode?.value() ?? this.original ?? "").selectable().scrollable().size_full())))))
       .when(Boolean(this.saveError), el => el.child(div().px(10).py(4).text_size(11.5).text_color(t.ansi1).child(`Save failed: ${this.saveError}`)));
   }
 
