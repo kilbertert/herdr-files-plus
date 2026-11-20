@@ -35,11 +35,26 @@ expand-on-click folders, watchFolder refresh) plus:
   `{file, root, on, term}` it runs a copy that skips `location()` tracking,
   refresh and its 10 s timer, and renders only the editor. Header, 40px:
   file icon, name (`·unsaved`/`·saving…` markers), the absolute path dimmed
-  (drag area), then Save and Close buttons. The window drags by any press
-  that isn't stopped — the buttons row, editor body and footer bar call
-  `stop_propagation()` on left mouse-down so editing and clicking don't move
-  it. Closing with a dirty buffer asks once ("Discard changes and close?").
-  The file loads straight into edit mode; over 400 KB it stays read-only.
+  (drag area), then the mode buttons, Save and Close. The window drags by
+  any press that isn't stopped — the buttons row, editor body and footer
+  bar call `stop_propagation()` on left mouse-down so editing and clicking
+  don't move it. Closing with a dirty buffer asks once ("Discard changes
+  and close?"). The file loads straight into edit mode; over 400 KB it
+  stays read-only.
+- **Maximize**: the `□` button reopens the window's own `key` at 0.98 share —
+  there is no overlay-resize command, and a same-key `openOverlay` replaces
+  the window *with a new copy*, so the live buffer is first stashed under
+  `shared("files-plus.buf:<key>")` and the replacement restores it (skipped
+  if the file changed on disk meanwhile). `props.fs` tells the new copy
+  which size it is; toggling back reopens at 0.72/0.8.
+- **Markdown preview** (`.md/.markdown/.mdx/.mdown/.mkd`): three header
+  buttons — source, source+preview split, preview — rendering with
+  `gpui-base`'s `TextView.markdown(id, text)` (rich markdown incl. code
+  fences, selectable + scrollable; **it lives in `gpui-base`, not
+  `gpui-kit`**). The preview text is `editCode.value()` so unsaved edits
+  preview live; the `Editor` keeps its `EditorState` while unmounted, so
+  switching back loses nothing. No live-WYSIWYG mode — `Editor` is plain
+  text.
 - **Save**: local machine → `writeTextFile(path, text, original)` (optimistic
   concurrency: fails if the file changed since read). Remote → the pane's
   terminal channel: write a local temp file, `hc put <machine>/<term> tmp`,
