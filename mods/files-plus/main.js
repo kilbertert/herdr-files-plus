@@ -3,7 +3,7 @@
 // a files-menu popup on right-click, and shared() hooks the menu writes back to.
 import { View, div, svg, image } from "gpui-kit";
 import { v_flex, h_flex, Editor, EditorState, Input, InputState, TextView } from "gpui-base";
-import { spaces, panes, focused, exec, hc, readTextFile, writeTextFile, watchFolder, theme, settings, window, openOverlay, closeOverlay, shared, setShared, notify, props, nextCommand } from "herdr";
+import { spaces, panes, focused, exec, hc, readTextFile, writeTextFile, watchFolder, theme, settings, window, openOverlay, closeOverlay, shared, setShared, notify, props, nextCommand, home, appHome } from "herdr";
 
 function location() {
   const space = spaces().find(s => s.active), f = focused();
@@ -169,6 +169,25 @@ const b64encode = (text) => {
   }
   return out;
 };
+
+// Markdown preview: ```mermaid fences are rendered to SVG by a local node
+// helper (~/.herdr-tools/mermaid) and shown via image(); the rest stays
+// TextView.markdown. Render results are cached per content hash in shared().
+const MERMAID_RE = /```mermaid[^\S\n]*\n([\s\S]*?)```/g;
+const splitMd = (text) => {
+  const segs = [];
+  let last = 0, m;
+  MERMAID_RE.lastIndex = 0;
+  while ((m = MERMAID_RE.exec(text))) {
+    if (m.index > last) segs.push({ kind: "md", text: text.slice(last, m.index) });
+    segs.push({ kind: "mmd", text: m[1] });
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) segs.push({ kind: "md", text: text.slice(last) });
+  return segs;
+};
+const djb = (s) => { let h = 5381; for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0; return h.toString(36); };
+const mmdKey = (h) => `files-plus.mmd.${h}`;
 
 async function directory(path, on, showHidden) {
   const windowsDirectory = async () => {
@@ -717,6 +736,46 @@ export default class Files extends View {
     return out;
   }
 
+  // Preview pane: plain markdown → one TextView; with mermaid blocks → a
+  // scrolled column alternating TextView segments and rendered SVG images.
+  mdPreview(t, cx) {
+    const text = this.editCode?.value() ?? this.original ?? "";
+    const segs = splitMd(text);
+    if (!segs.some((s) => s.kind === "mmd")) {
+      return div().flex_1().min_w(0).h_full().p(14)
+        .child(TextView.markdown("fe-md", text).selectable().scrollable().size_full());
+    }
+    const col = v_flex().flex_1().min_w(0).h_full().p(14).gap(10).overflow_y_scroll();
+    segs.forEach((seg, i) => {
+      if (seg.kind === "md") {
+        if (seg.text.trim()) col.child(TextView.markdown(`fe-md-${i}`, seg.text).selectable().flex_none());
+        return;
+      }
+      const h = djb(seg.text);
+      const state = shared(mmdKey(h));
+      if (state == null) {
+        setShared(mmdKey(h), "pending");
+        cx.spawn(async (cx) => {
+          const out = `${appHome()}/data/mermaid/${h}.svg`;
+          let ok = false;
+          try {
+            const r = await exec("node", [`${home()}/.herdr-tools/mermaid/render.mjs`, b64encode(seg.text), out], { timeout: 30000 });
+            ok = r.code === 0 && r.stdout.trim() === "OK";
+          } catch { /* node/tool missing → code-block fallback */ }
+          setShared(mmdKey(h), ok ? "ok" : "err");
+          cx.notify();
+        });
+      }
+      col.child(div().flex_none().child(
+        state === "ok"
+          ? div().overflow_x_scroll().child(image(`data/mermaid/${h}.svg`))
+          : state === "err"
+            ? TextView.markdown(`fe-mmd-${i}`, "```mermaid\n" + seg.text + "\n```").flex_none()
+            : div().p(8).text_color(t.dim).child("Rendering diagram…")));
+    });
+    return col;
+  }
+
   // Editor-window view (this.overlay set): one file, header + editor + close.
   // Left presses on the controls/body are stopped so they don't drag the window.
   renderEditor(cx) {
@@ -741,8 +800,7 @@ export default class Files extends View {
         .when(!this.isMd() || this.mdMode !== "preview", el => el.child(div().flex_1().min_w(0).h_full()
           .child((this.editCode ?? this.code) ? Editor.new(this.editCode ?? this.code).size_full() : div().p(12).text_color(t.dim).child(this.fileError || "Loading file…"))))
         .when(this.isMd() && this.mdMode === "split", el => el.child(div().w(1).h_full().flex_none().bg(t.border)))
-        .when(this.isMd() && this.mdMode !== "source", el => el.child(div().flex_1().min_w(0).h_full().p(14)
-          .child(TextView.markdown("fe-md", this.editCode?.value() ?? this.original ?? "").selectable().scrollable().size_full())))))
+        .when(this.isMd() && this.mdMode !== "source", el => el.child(this.mdPreview(t, cx)))))
       .when(Boolean(this.saveError), el => el.child(div().px(10).py(4).text_size(11.5).text_color(t.ansi1).child(`Save failed: ${this.saveError}`)));
   }
 
