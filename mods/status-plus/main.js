@@ -88,10 +88,12 @@ export default class StatusPlus extends View {
 
   // One subscription segment: program icon + per-window remaining percent,
   // colored per window (red <25%, yellow <50%). A window in use also shows
-  // its reset countdown (↻1.9h); one with zero consumption is NA, not a
-  // misleading 100% — the number appears when usage does. Hidden when the
-  // collector has no data rather than showing a guess.
-  quotaSeg(icon, entry, t) {
+  // its reset countdown (↻1.9h). Zero consumption is honest 100% — the data
+  // says the pool is full, and NA reads as "broken" rather than "full"
+  // (user feedback). naZero keeps the NA placeholder for the claude segment
+  // only, per explicit user request there. Hidden when the collector has no
+  // data rather than showing a guess.
+  quotaSeg(icon, entry, t, naZero) {
     if (!entry?.ok || !entry.windows?.length) return null;
     const col = (rem) => rem < 25 ? t.ansi1 : rem < 50 ? t.ansi3 : t.muted;
     const cd = (resetAt) => {
@@ -102,9 +104,9 @@ export default class StatusPlus extends View {
       return `↻${(s / 86400).toFixed(1)}d`;
     };
     const txt = (w) => {
-      if (!w.used) return `${w.label}·NA`;
+      if (!w.used && naZero) return `${w.label}·NA`;
       const rem = Math.max(0, 100 - w.used);
-      return `${w.label}·${rem}%${rem < 100 ? cd(w.reset_at) : ""}`;
+      return `${w.label}·${rem}%${w.used ? cd(w.reset_at) : ""}`;
     };
     return h_flex().gap(5).items_center().flex_none()
       .child(image(icon).w(13).h(13).flex_none())
@@ -126,7 +128,7 @@ export default class StatusPlus extends View {
     const statV = (v, color) => div().text_color(color).child(v);
     return h_flex().size_full().px(14).gap(16).items_center().bg(t.chrome).border_t(1).border_color(t.border).text_size(11.8).text_color(t.muted)
       .child(label(space?.machine ? "server" : "monitor", space?.machine ?? "This computer"))
-      .children([this.quotaSeg("icons/claude.svg", this.quota?.claude, t),
+      .children([this.quotaSeg("icons/claude.svg", this.quota?.claude, t, true),
         this.quotaSeg("icons/codex.svg", this.quota?.codex, t),
         this.quotaSeg("icons/antigravity.svg", this.quota?.agy, t)].filter(Boolean))
       .when(Boolean(s), el => el.child(h_flex().gap(12).items_center().children([
