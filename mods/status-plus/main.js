@@ -108,7 +108,8 @@ export default class StatusPlus extends View {
     const seg = (text) => div().child(text);
     return h_flex().size_full().px(14).gap(16).items_center().bg(t.chrome).border_t(1).border_color(t.border).text_size(11.8).text_color(t.muted)
       .child(label(space?.machine ? "server" : "monitor", space?.machine ?? "This computer"))
-      .when(Boolean(space?.branch), el => el.child(label("branch", space.branch)))
+      .children([this.quotaSeg("icons/codex.svg", this.quota?.codex, t),
+        this.quotaSeg("icons/antigravity.svg", this.quota?.agy, t)].filter(Boolean))
       .child(h_flex().gap(6).items_center().child(div().size(6).rounded(3).bg(t.dim)).child(`${list.length} ${list.length === 1 ? "agent" : "agents"}`)
         .when(needs > 0, el => el.child(div().text_color(t.blocked).child(`· ${needs} ${needs === 1 ? "needs" : "need"} you`))))
       .when(Boolean(s), el => el.children([
@@ -119,8 +120,6 @@ export default class StatusPlus extends View {
         s.down != null ? seg(`${rate(s.down)}↓ ${rate(s.up)}↑`) : null,
         seg(`${s.rtt}ms`),
       ].filter(Boolean)))
-      .children([this.quotaSeg("icons/codex.svg", this.quota?.codex, t),
-        this.quotaSeg("icons/antigravity.svg", this.quota?.agy, t)].filter(Boolean))
       .child(div().flex_1())
       .child(div().id("palette").text_color(t.dim).on_click(() => run("app.palette")).child(this.hint(t)));
   }
