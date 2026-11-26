@@ -87,15 +87,24 @@ export default class StatusPlus extends View {
   }
 
   // One subscription segment: program icon + per-window remaining percent,
-  // colored per window (red <25%, yellow <50%). Hidden when the
-  // collector has no data rather than showing a guess.
+  // colored per window (red <25%, yellow <50%). A window in use also shows
+  // its reset countdown (↻1.9h); a full one has nothing to count down to.
+  // Hidden when the collector has no data rather than showing a guess.
   quotaSeg(icon, entry, t) {
     if (!entry?.ok || !entry.windows?.length) return null;
     const rems = entry.windows.map((w) => Math.max(0, 100 - w.used));
     const col = (rem) => rem < 25 ? t.ansi1 : rem < 50 ? t.ansi3 : t.muted;
+    const cd = (resetAt) => {
+      const s = (resetAt ?? 0) - Date.now() / 1000;
+      if (s <= 0) return "";
+      if (s < 3600) return `↻${Math.max(1, Math.round(s / 60))}m`;
+      if (s < 86400) return `↻${(s / 3600).toFixed(1)}h`;
+      return `↻${(s / 86400).toFixed(1)}d`;
+    };
     return h_flex().gap(5).items_center().flex_none()
       .child(image(icon).w(13).h(13).flex_none())
-      .children(entry.windows.map((w, i) => div().text_color(col(rems[i])).child(`${w.label}·${rems[i]}%`)));
+      .children(entry.windows.map((w, i) => div().text_color(col(rems[i]))
+        .child(`${w.label}·${rems[i]}%${rems[i] < 100 ? cd(w.reset_at) : ""}`)));
   }
 
   render() {
