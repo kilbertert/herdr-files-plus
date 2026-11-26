@@ -2,7 +2,7 @@
 // machine (CPU, temp, RAM, disk, net rates, latency). One fast sh snapshot per
 // 10s poll; rates computed from the previous snapshot, so the exec round-trip
 // itself is the latency figure. Stats hide where sh is unavailable.
-import { View, div, svg } from "gpui-kit";
+import { View, div, svg, image } from "gpui-kit";
 import { h_flex } from "gpui-base";
 import { spaces, agents, theme, run, window, keys, exec, focused, panes } from "herdr";
 
@@ -21,8 +21,24 @@ export default class StatusPlus extends View {
   init(_props, cx) {
     this.stats = null;
     this.prev = null;
+    this.quota = null;
     this.sample(cx);
     cx.timer.every(10000, cx => this.sample(cx));
+    this.pollQuota(cx);
+    cx.timer.every(300000, cx => this.pollQuota(cx));
+  }
+
+  // Subscription quota (codex + agy) comes from subquota.py on dev-us: it
+  // borrows rl-1's fresh codex token over ssh and reads the agy statusline's
+  // persisted quota. Machine-independent, so always ask dev-us.
+  pollQuota(cx) {
+    cx.spawn(async cx => {
+      try {
+        const r = await exec("sh", ["-c", "python3 ~/.local/bin/subquota.py"], { on: "dev-us", timeout: 25000 });
+        if (r.code === 0) this.quota = JSON.parse(r.stdout);
+      } catch { /* dev-us unreachable: keep last reading */ }
+      cx.notify();
+    });
   }
 
   machine() {
@@ -70,6 +86,20 @@ export default class StatusPlus extends View {
     return key ? `${key}  commands` : "commands";
   }
 
+  // One subscription segment: program icon + per-window remaining percent,
+  // colored by the emptiest window (red <25%, yellow <50%). Hidden when the
+  // collector has no data rather than showing a guess.
+  quotaSeg(icon, entry, t) {
+    if (!entry?.ok || !entry.windows?.length) return null;
+    const rems = entry.windows.map((w) => Math.max(0, 100 - w.used));
+    const worst = Math.min(...rems);
+    const col = worst < 25 ? t.ansi1 : worst < 50 ? t.ansi3 : t.muted;
+    const txt = entry.windows.map((w, i) => `${w.label}·${rems[i]}%`).join(" ");
+    return h_flex().gap(5).items_center().flex_none().text_color(col)
+      .child(image(icon).w(13).h(13).flex_none())
+      .child(div().child(txt));
+  }
+
   render() {
     const t = theme();
     const space = spaces().find(s => s.active);
@@ -91,6 +121,8 @@ export default class StatusPlus extends View {
         s.down != null ? seg(`${rate(s.down)}↓ ${rate(s.up)}↑`) : null,
         seg(`${s.rtt}ms`),
       ].filter(Boolean)))
+      .children([this.quotaSeg("icons/codex.svg", this.quota?.codex, t),
+        this.quotaSeg("icons/antigravity.svg", this.quota?.agy, t)].filter(Boolean))
       .child(div().flex_1())
       .child(div().id("palette").text_color(t.dim).on_click(() => run("app.palette")).child(this.hint(t)));
   }
