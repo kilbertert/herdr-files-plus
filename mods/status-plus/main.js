@@ -87,17 +87,15 @@ export default class StatusPlus extends View {
   }
 
   // One subscription segment: program icon + per-window remaining percent,
-  // colored by the emptiest window (red <25%, yellow <50%). Hidden when the
+  // colored per window (red <25%, yellow <50%). Hidden when the
   // collector has no data rather than showing a guess.
   quotaSeg(icon, entry, t) {
     if (!entry?.ok || !entry.windows?.length) return null;
     const rems = entry.windows.map((w) => Math.max(0, 100 - w.used));
-    const worst = Math.min(...rems);
-    const col = worst < 25 ? t.ansi1 : worst < 50 ? t.ansi3 : t.muted;
-    const txt = entry.windows.map((w, i) => `${w.label}·${rems[i]}%`).join(" ");
-    return h_flex().gap(5).items_center().flex_none().text_color(col)
+    const col = (rem) => rem < 25 ? t.ansi1 : rem < 50 ? t.ansi3 : t.muted;
+    return h_flex().gap(5).items_center().flex_none()
       .child(image(icon).w(13).h(13).flex_none())
-      .child(div().child(txt));
+      .children(entry.windows.map((w, i) => div().text_color(col(rems[i])).child(`${w.label}·${rems[i]}%`)));
   }
 
   render() {
