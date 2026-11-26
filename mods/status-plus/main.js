@@ -4,7 +4,7 @@
 // itself is the latency figure. Stats hide where sh is unavailable.
 import { View, div, svg, image } from "gpui-kit";
 import { h_flex } from "gpui-base";
-import { spaces, agents, theme, run, window, keys, exec, focused, panes } from "herdr";
+import { spaces, theme, run, window, keys, exec, focused, panes } from "herdr";
 
 const SCRIPT = `
 read _ u n s i r q t st _ </proc/stat; echo "ct=$((u+n+s+i+r+q+t+st)) ci=$i"
@@ -15,7 +15,7 @@ df -P "\${1:-/}" | awk 'NR==2{print "disk_used="$3" disk_tot="$2" disk_pct="subs
 `;
 
 const gib = (kb) => { const g = kb / 1048576; return g >= 10 ? g.toFixed(0) : g.toFixed(1); };
-const rate = (k) => k >= 1024 ? `${(k / 1024).toFixed(1)}MB/s` : `${k}KB/s`;
+const rate = (k) => k >= 1024 ? `${(k / 1024).toFixed(1)}M` : `${k}K`;
 
 export default class StatusPlus extends View {
   init(_props, cx) {
@@ -115,26 +115,28 @@ export default class StatusPlus extends View {
   render() {
     const t = theme();
     const space = spaces().find(s => s.active);
-    const list = agents();
-    const needs = list.filter(a => a.status === "blocked").length;
     const label = (icon, text) => h_flex().gap(6).items_center().child(svg(`mods/workspace-chrome/${icon}.svg`).size(13)).child(text);
     const s = this.stats;
-    const seg = (text) => div().child(text);
+    // severity color for usage-type metrics: yellow 70+, red 90+
+    const lvl = (pct) => pct >= 90 ? t.ansi1 : pct >= 70 ? t.ansi3 : t.muted;
+    // two-tone stat: dim label + severity-colored value, `LABEL used·pct` mirroring
+    // the quota segments' visual grammar; naked values (temp/net/rtt) carry units
+    const statL = (l, v, color) => h_flex().gap(4).items_center().flex_none()
+      .child(div().text_color(t.dim).child(l)).child(div().text_color(color).child(v));
+    const statV = (v, color) => div().text_color(color).child(v);
     return h_flex().size_full().px(14).gap(16).items_center().bg(t.chrome).border_t(1).border_color(t.border).text_size(11.8).text_color(t.muted)
       .child(label(space?.machine ? "server" : "monitor", space?.machine ?? "This computer"))
       .children([this.quotaSeg("icons/claude.svg", this.quota?.claude, t),
         this.quotaSeg("icons/codex.svg", this.quota?.codex, t),
         this.quotaSeg("icons/antigravity.svg", this.quota?.agy, t)].filter(Boolean))
-      .child(h_flex().gap(6).items_center().child(div().size(6).rounded(3).bg(t.dim)).child(`${list.length} ${list.length === 1 ? "agent" : "agents"}`)
-        .when(needs > 0, el => el.child(div().text_color(t.blocked).child(`· ${needs} ${needs === 1 ? "needs" : "need"} you`))))
-      .when(Boolean(s), el => el.children([
-        s.cpu != null ? seg(`Cpu ${s.cpu}%`) : null,
-        s.temp ? seg(`Temp ${s.temp}°C`) : null,
-        s.mem_tot ? seg(`RAM ${gib(s.mem_used)}/${gib(s.mem_tot)}GB`) : null,
-        s.disk_tot ? seg(`Disk ${gib(s.disk_used)}/${gib(s.disk_tot)}GB·${s.disk_pct}%`) : null,
-        s.down != null ? seg(`${rate(s.down)}↓ ${rate(s.up)}↑`) : null,
-        seg(`${s.rtt}ms`),
-      ].filter(Boolean)))
+      .when(Boolean(s), el => el.child(h_flex().gap(12).items_center().children([
+        s.cpu != null ? statL("CPU", `${s.cpu}%`, lvl(s.cpu)) : null,
+        s.temp ? statV(`${s.temp}°C`, s.temp >= 80 ? t.ansi1 : s.temp >= 60 ? t.ansi3 : t.muted) : null,
+        s.mem_tot ? statL("RAM", `${gib(s.mem_used)}G·${Math.round(s.mem_used * 100 / s.mem_tot)}%`, lvl(s.mem_used * 100 / s.mem_tot)) : null,
+        s.disk_tot ? statL("DISK", `${gib(s.disk_used)}G·${s.disk_pct}%`, lvl(s.disk_pct ?? 0)) : null,
+        s.down != null ? statV(`↓${rate(s.down)} ↑${rate(s.up)}`, t.muted) : null,
+        statV(`${s.rtt}ms`, s.rtt >= 400 ? t.ansi1 : s.rtt >= 150 ? t.ansi3 : t.muted),
+      ].filter(Boolean))))
       .child(div().flex_1())
       .child(div().id("palette").text_color(t.dim).on_click(() => run("app.palette")).child(this.hint(t)));
   }
