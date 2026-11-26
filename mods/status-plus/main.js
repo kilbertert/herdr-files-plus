@@ -117,7 +117,8 @@ export default class StatusPlus extends View {
     const seg = (text) => div().child(text);
     return h_flex().size_full().px(14).gap(16).items_center().bg(t.chrome).border_t(1).border_color(t.border).text_size(11.8).text_color(t.muted)
       .child(label(space?.machine ? "server" : "monitor", space?.machine ?? "This computer"))
-      .children([this.quotaSeg("icons/codex.svg", this.quota?.codex, t),
+      .children([this.quotaSeg("icons/claude.svg", this.quota?.claude, t),
+        this.quotaSeg("icons/codex.svg", this.quota?.codex, t),
         this.quotaSeg("icons/antigravity.svg", this.quota?.agy, t)].filter(Boolean))
       .child(h_flex().gap(6).items_center().child(div().size(6).rounded(3).bg(t.dim)).child(`${list.length} ${list.length === 1 ? "agent" : "agents"}`)
         .when(needs > 0, el => el.child(div().text_color(t.blocked).child(`· ${needs} ${needs === 1 ? "needs" : "need"} you`))))
